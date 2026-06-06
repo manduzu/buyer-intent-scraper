@@ -141,7 +141,11 @@ class KenyaPpipSource:
             intent_direction="requesting",  # every active tender is a buyer
             emails=emails,
             phones=phones,
-            website=str(pe.get("org_url") or ""),
+            # Leave website blank: org_url is the procuring entity's domain, which
+            # is shared across all of its tenders. Since dedupe_key() prefers
+            # website, setting it would collapse every distinct tender from one
+            # entity into a single lead (same convention as the World Bank source).
+            website="",
             published_date=str(t.get("published_at") or "")[:10],
             deadline=str(t.get("close_at") or "")[:10],
             reference=str(t.get("tender_ref") or ""),
