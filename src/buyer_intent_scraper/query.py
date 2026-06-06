@@ -151,6 +151,8 @@ def parse_query(text: str, intent_keywords: list[str] | None = None) -> ServiceQ
     return ServiceQuery(
         service=service,
         location=location,
-        intent_keywords=list(intent_keywords) if intent_keywords else list(INTENT_KEYWORDS),
+        intent_keywords=(
+            list(intent_keywords) if intent_keywords is not None else list(INTENT_KEYWORDS)
+        ),
         raw=raw,
     )
