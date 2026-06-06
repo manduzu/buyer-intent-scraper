@@ -9,6 +9,7 @@ queries:
 # Which source crawlers to run.
 sources:
   - world_bank      # live World Bank procurement notices API (structured, with contacts)
+  - kenya_ppip      # live Kenya PPIP / tenders.go.ke API (open Kenya tenders, with contacts)
   - google_dork
   - tender_portal
   - directory

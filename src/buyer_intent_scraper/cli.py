@@ -112,8 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument(
         "--sources",
         nargs="+",
-        default=["world_bank", "google_dork", "tender_portal", "directory"],
-        choices=["world_bank", "google_dork", "tender_portal", "directory", "agent"],
+        default=["world_bank", "kenya_ppip", "google_dork", "tender_portal", "directory"],
+        choices=["world_bank", "kenya_ppip", "google_dork", "tender_portal", "directory", "agent"],
         help="'agent' = Gemini browser_use engine (needs GEMINI_API_KEY + '.[agent]')",
     )
     sp.add_argument("--max-results", type=int, default=10, help="results per source")

@@ -8,17 +8,24 @@ Give it a plain-English query like:
 
 > "who is requesting construction services in Nairobi, Kenya"
 
-It researches the web with **three engines** that feed one deduplicated report:
+It researches the web with several **engines** that feed one deduplicated report:
 
 1. **World Bank procurement API** (`world_bank`) — live, structured notices
    (Invitation for Bids, RFEoI, …) with the procuring entity's contact, the
    **submission deadline**, reference number and category. No API key, no LLM,
-   zero tokens — this is the reliable default engine.
-2. **Search-engine dorking + portals + directories** (`google_dork`,
+   zero tokens.
+2. **Kenya PPIP API** (`kenya_ppip`) — live **open** tenders from the official
+   Public Procurement Information Portal (`tenders.go.ke`). Each record carries
+   the procuring entity (county, ministry, NG-CDF, parastatal…), its email/phone,
+   the closing date, reference and category. Keyless, no LLM, zero tokens — the
+   most productive engine for Kenya.
+   *(The two API engines above are the reliable defaults and don't depend on
+   search backends, which are heavily rate-limited.)*
+3. **Search-engine dorking + portals + directories** (`google_dork`,
    `tender_portal`, `directory`) — Google via SerpAPI or DuckDuckGo (no key),
    targeting buyer-intent keywords (RFQ, tender, "expression of interest", …) on
    sites like `tenders.go.ke`, `businesslist.co.ke`.
-3. **Gemini `browser_use` agent** (`agent`, optional) — an LLM that *navigates*
+4. **Gemini `browser_use` agent** (`agent`, optional) — an LLM that *navigates*
    live pages and returns structured leads. Token-frugal by design (vision off,
    thinking off, seeded onto a results page, few steps). Needs a free Gemini key.
 
@@ -47,7 +54,7 @@ buyer-intent-scraper scrape "construction services in Nairobi, Kenya" \
 Writes `out/leads.xlsx` (Excel) and prints a summary of the top leads.
 
 Options: `--format {xlsx,csv,both}` (default `xlsx`), `--sources world_bank
-google_dork tender_portal directory agent`, `--max-results`, `--max-leads`,
+kenya_ppip google_dork tender_portal directory agent`, `--max-results`, `--max-leads`,
 `--min-confidence`, `--require-contact`, `--include-offering`, `--include-closed`,
 `--any-location`, `--include-aggregators`, `--country-tld`, `--ignore-robots`.
 

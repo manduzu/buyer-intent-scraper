@@ -12,6 +12,7 @@ from buyer_intent_scraper.pipeline import (
     score_lead,
 )
 from buyer_intent_scraper.query import parse_query
+from buyer_intent_scraper.sources.kenya_ppip import KenyaPpipSource
 from buyer_intent_scraper.sources.world_bank import WorldBankSource
 
 
@@ -166,3 +167,44 @@ def test_world_bank_notice_to_lead():
 
     award = dict(notice, notice_type="Contract Award", submission_deadline_date="")
     assert src._notice_to_lead(award, q).intent_direction != "requesting"
+
+
+def test_kenya_ppip_keyword_selection():
+    src = KenyaPpipSource()
+    assert src._keyword(parse_query("construction works in Kenya")) == "construction"
+    assert src._keyword(parse_query("road works in Kenya")) == "road"
+    assert src._keyword(parse_query("office cleaning services in Nairobi, Kenya")) == "cleaning"
+
+
+def test_kenya_ppip_tender_to_lead():
+    src = KenyaPpipSource()
+    q = parse_query("construction works in Kenya")
+    tender = {
+        "id": 292115,
+        "title": "PROPOSED CONSTRUCTION OF CLASSROOMS",
+        "tender_ref": "JMV/NG-CDF/004/2025-2026",
+        "published_at": "2026-05-26 00:00:00",
+        "close_at": "2026-06-08 00:00:00",
+        "description": "Works for two classroom blocks",
+        "procurement_category": {"description": "Works Services"},
+        "created_by": {"email": "officer@ngcdf.go.ke", "phone": "254769536138"},
+        "pe": {
+            "name": "NG-CDF JOMVU",
+            "email": "cdfjomvu@ngcdf.go.ke",
+            "telephone": "25441222333",
+            "city": "Mombasa",
+            "org_url": "ngcdf.go.ke",
+            "type": {"description": "Constituency Fund"},
+        },
+    }
+    lead = src._tender_to_lead(tender, q)
+    assert lead.name == "NG-CDF JOMVU"
+    assert lead.intent_direction == "requesting"
+    assert lead.deadline == "2026-06-08"
+    assert lead.reference == "JMV/NG-CDF/004/2025-2026"
+    assert lead.category == "Works Services"
+    assert lead.entity_type == "Constituency Fund"
+    assert lead.location == "Mombasa, Kenya"
+    assert "cdfjomvu@ngcdf.go.ke" in lead.emails
+    assert lead.source_url.endswith("292115")
+    assert lead.website == "ngcdf.go.ke"
