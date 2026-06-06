@@ -50,7 +50,7 @@ class TenderPortalSource:
 
     def collect(self, query: ServiceQuery, max_results: int = 10) -> list[SearchResult]:
         results: list[SearchResult] = []
-        term = TENDER_TERMS[1] if query.intent_keywords else "tender"
+        term = TENDER_TERMS[0]  # broad "tender" term for widest portal coverage
         for portal in self.portals:
             dork = build_dork(query.service, query.location, term, site=portal)
             logger.info("[tender_portal] %s", dork)
