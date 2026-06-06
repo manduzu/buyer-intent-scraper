@@ -29,6 +29,10 @@ from buyer_intent_scraper.sources import (
 
 logger = logging.getLogger(__name__)
 
+# Sources whose Lead.location is an authoritative field of the notice (not just a
+# copy of the query location). Only these may match location on lead.location.
+_AUTHORITATIVE_LOCATION_SOURCES = {"world_bank", "agent"}
+
 # Common country -> ccTLD, used to accept leads on a matching country domain
 # even when the snippet text doesn't spell out the location.
 _COUNTRY_TLDS = {
@@ -73,10 +77,18 @@ def location_relevant(lead: Lead, query: ServiceQuery) -> bool:
 
     A lead matches when its text mentions a location token (city/country) or
     when it sits on the target country's ccTLD (e.g. ``.ke`` for Kenya).
+
+    Only structured sources whose ``location`` is an authoritative field of the
+    notice (World Bank, the agent) get to match on ``lead.location``. For
+    search-based leads ``location`` is just a copy of ``query.location``, so
+    including it would make this check tautological and let off-target foreign
+    tenders through.
     """
     if not query.location:
         return True
-    blob = f"{lead.source_title} {lead.intent_signal} {lead.name} {lead.location}".lower()
+    blob = f"{lead.source_title} {lead.intent_signal} {lead.name}".lower()
+    if lead.source_type in _AUTHORITATIVE_LOCATION_SOURCES:
+        blob = f"{blob} {lead.location}".lower()
     tokens = [
         part.strip().lower()
         for part in re.split(r"[,/]", query.location)
