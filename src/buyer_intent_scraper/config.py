@@ -30,6 +30,7 @@ class Config:
     max_leads_per_query: int = 50
     min_confidence: float = 0.0
     require_contact: bool = False
+    only_requesting: bool = True  # keep only demand-side (requesting) leads
     respect_robots: bool = True
     country_tld: str = ""
     tender_portals: list[str] = field(default_factory=list)

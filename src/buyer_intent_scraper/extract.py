@@ -84,6 +84,70 @@ def classify_entity(name: str, text: str = "") -> str:
     return "unknown"
 
 
+# Demand-side language: the entity is *requesting* / buying a service.
+_REQUESTING_RE = re.compile(
+    r"\b("
+    r"request for (quotation|proposal|proposals|tender|tenders|bid|bids|information|"
+    r"expression of interest)|"
+    r"rfq|rfp|rfi|eoi|"
+    r"invitation (to|for) (tender|tenders|bid|bids)|"
+    r"invitation for bids|"
+    r"tender (notice|no\.?|ref\.?|number|reference|document)|"
+    r"prequalification|pre-qualification|"
+    r"call for (proposals|bids|tenders|applications|quotations)|"
+    r"expression[s]? of interest|"
+    r"looking for (a |an |our )?(contractor|supplier|vendor|provider|company|firm|consultant)|"
+    r"seeking (a |an )?(contractor|supplier|vendor|provider|quotes?|quotation|proposals?)|"
+    r"we (are looking for|require|need|are seeking|are inviting)|"
+    r"submit (your )?(a )?(bid|bids|quotation|quotations|proposal|proposals|tender)|"
+    r"bidders|bidding documents|procuring entity|"
+    r"(wanted|needed)\b|"
+    r"closing date|submission deadline|due date"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Supply-side language: the entity is *offering* / selling a service.
+_OFFERING_RE = re.compile(
+    r"\b("
+    r"we (offer|provide|speciali[sz]e|deliver|supply)|"
+    r"our (services|products|solutions|portfolio|clients|team)|"
+    r"services (include|offered)|"
+    r"we are (a |an |the )?(leading|premier|trusted|top|best|number one|reliable)|"
+    r"leading (provider|supplier|contractor|company|manufacturer)|"
+    r"(get|request|ask for) (a )?(free )?(quote|estimate)|"
+    r"contact us (for|today)|"
+    r"for all your .{0,30} needs|"
+    r"years of experience|established in|since \d{4}|"
+    r"for sale|buy now|shop now|add to cart|our pricing|view our"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def classify_intent_direction(text: str, source_type: str = "") -> str:
+    """Classify whether the page reflects *requesting* vs *offering* a service.
+
+    Returns ``"requesting"``, ``"offering"`` or ``"unknown"``. Text signals
+    dominate; the source type only nudges the decision (tender portals lean
+    requesting, directories lean offering).
+    """
+    blob = text[:4000]
+    req = len(_REQUESTING_RE.findall(blob))
+    off = len(_OFFERING_RE.findall(blob))
+    if source_type == "tender_portal":
+        req += 2
+    elif source_type == "directory":
+        off += 2
+    if req == 0 and off == 0:
+        return "unknown"
+    if req > off:
+        return "requesting"
+    if off > req:
+        return "offering"
+    return "unknown"
+
+
 def extract_emails(text: str) -> list[str]:
     found: list[str] = []
     for m in _EMAIL_RE.findall(text or ""):

@@ -1,6 +1,7 @@
 from buyer_intent_scraper.extract import (
     ContactExtractor,
     classify_entity,
+    classify_intent_direction,
     extract_emails,
     extract_phones,
     registered_domain,
@@ -42,6 +43,27 @@ def test_classify_entity():
     assert classify_entity("Nairobi County Government") == "government"
     assert classify_entity("Hope Foundation Trust") == "organization"
     assert classify_entity("John Doe") == "unknown"
+
+
+def test_classify_intent_direction():
+    # Demand-side language -> requesting.
+    assert (
+        classify_intent_direction("Invitation to tender for road works. Closing date 5 May.")
+        == "requesting"
+    )
+    assert (
+        classify_intent_direction("We are looking for a supplier to provide cement.")
+        == "requesting"
+    )
+    # Supply-side language -> offering.
+    assert (
+        classify_intent_direction("We are a leading provider. We offer the best services.")
+        == "offering"
+    )
+    # Source priors nudge ambiguous text.
+    assert classify_intent_direction("Project listing", source_type="tender_portal") == "requesting"
+    assert classify_intent_direction("Business listing", source_type="directory") == "offering"
+    assert classify_intent_direction("nothing relevant here") == "unknown"
 
 
 def test_extract_from_html_offline(monkeypatch):

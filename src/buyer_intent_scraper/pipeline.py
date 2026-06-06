@@ -7,7 +7,11 @@ import re
 from collections.abc import Iterable
 
 from buyer_intent_scraper.config import Config
-from buyer_intent_scraper.extract import ContactExtractor, classify_entity
+from buyer_intent_scraper.extract import (
+    ContactExtractor,
+    classify_entity,
+    classify_intent_direction,
+)
 from buyer_intent_scraper.models import Lead, SearchResult
 from buyer_intent_scraper.query import ServiceQuery, parse_query
 from buyer_intent_scraper.search import SearchBackend, get_search_backend
@@ -73,7 +77,11 @@ def score_lead(lead: Lead, query: ServiceQuery) -> float:
         score += 0.05
     if lead.source_type == "tender_portal":
         score += 0.05
-    return round(min(score, 1.0), 3)
+    if lead.intent_direction == "requesting":
+        score += 0.1
+    elif lead.intent_direction == "offering":
+        score -= 0.1
+    return round(min(max(score, 0.0), 1.0), 3)
 
 
 def dedupe_leads(leads: Iterable[Lead]) -> list[Lead]:
@@ -97,6 +105,7 @@ def _result_to_lead(
     # a useful "website". For portal/directory hits the domain is the portal, not
     # the lead, so we leave website blank to avoid bad dedupe collisions.
     website = contacts.website if result.source_type == "google_dork" else ""
+    direction_blob = f"{result.title} {result.snippet} {contacts.page_text}"
     lead = Lead(
         name=name,
         service=query.service,
@@ -106,6 +115,7 @@ def _result_to_lead(
         source_url=result.url,
         source_title=result.title,
         entity_type=classify_entity(name, contacts.page_text),
+        intent_direction=classify_intent_direction(direction_blob, result.source_type),
         emails=contacts.emails,
         phones=contacts.phones,
         website=website,
@@ -141,6 +151,8 @@ def run_query(
     leads = [_result_to_lead(r, query, extractor) for r in results]
     leads = dedupe_leads(leads)
 
+    if config.only_requesting:
+        leads = [lead for lead in leads if lead.intent_direction == "requesting"]
     if config.require_contact:
         leads = [lead for lead in leads if lead.has_contact()]
     if config.min_confidence > 0:

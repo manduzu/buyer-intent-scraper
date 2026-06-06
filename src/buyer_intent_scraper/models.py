@@ -29,6 +29,7 @@ class Lead:
     source_url: str
     source_title: str = ""
     entity_type: str = "unknown"  # company | individual | organization | government | unknown
+    intent_direction: str = "unknown"  # requesting | offering | unknown
     emails: list[str] = field(default_factory=list)
     phones: list[str] = field(default_factory=list)
     website: str = ""

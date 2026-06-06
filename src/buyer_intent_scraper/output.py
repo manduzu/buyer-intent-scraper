@@ -10,6 +10,7 @@ from buyer_intent_scraper.models import Lead
 CSV_FIELDS = [
     "name",
     "entity_type",
+    "intent_direction",
     "service",
     "location",
     "intent_signal",
@@ -29,6 +30,7 @@ def lead_to_row(lead: Lead) -> dict[str, str]:
     return {
         "name": lead.name,
         "entity_type": lead.entity_type,
+        "intent_direction": lead.intent_direction,
         "service": lead.service,
         "location": lead.location,
         "intent_signal": lead.intent_signal,
@@ -59,6 +61,7 @@ def write_csv(leads: list[Lead], path: str | Path) -> Path:
 _XLSX_WIDTHS = {
     "name": 32,
     "entity_type": 13,
+    "intent_direction": 15,
     "service": 22,
     "location": 18,
     "intent_signal": 60,

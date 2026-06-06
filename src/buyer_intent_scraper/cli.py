@@ -45,6 +45,7 @@ def cmd_scrape(args: argparse.Namespace) -> int:
         max_results_per_source=args.max_results,
         max_leads_per_query=args.max_leads,
         require_contact=args.require_contact,
+        only_requesting=not args.include_offering,
         min_confidence=args.min_confidence,
         respect_robots=not args.ignore_robots,
         country_tld=args.country_tld or "",
@@ -114,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--max-leads", type=int, default=50, help="max leads to keep")
     sp.add_argument("--min-confidence", type=float, default=0.0)
     sp.add_argument("--require-contact", action="store_true", help="only keep leads with contacts")
+    sp.add_argument(
+        "--include-offering",
+        action="store_true",
+        help="also include providers/sellers (default: only entities requesting)",
+    )
     sp.add_argument("--country-tld", default="", help='restrict some dorks to a TLD, e.g. "ke"')
     sp.add_argument("--ignore-robots", action="store_true", help="do not honor robots.txt")
     sp.set_defaults(func=cmd_scrape)
