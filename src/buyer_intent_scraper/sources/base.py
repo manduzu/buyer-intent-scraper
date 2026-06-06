@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
-from buyer_intent_scraper.models import SearchResult
+from buyer_intent_scraper.models import Lead, SearchResult
 from buyer_intent_scraper.query import ServiceQuery
 
 
@@ -14,6 +14,20 @@ class Source(Protocol):
     name: str
 
     def collect(self, query: ServiceQuery, max_results: int = 10) -> list[SearchResult]:
+        ...
+
+
+@runtime_checkable
+class LeadSource(Protocol):
+    """A source that yields fully-formed :class:`Lead` objects directly.
+
+    Used by API-backed sources (e.g. World Bank) whose responses already carry
+    structured contact details, so no separate page fetch/extraction is needed.
+    """
+
+    name: str
+
+    def collect_leads(self, query: ServiceQuery, max_results: int = 10) -> list[Lead]:
         ...
 
 

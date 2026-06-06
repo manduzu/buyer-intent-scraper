@@ -1,7 +1,10 @@
+from datetime import date
+
 from buyer_intent_scraper.config import Config
 from buyer_intent_scraper.extract import ContactExtractor
 from buyer_intent_scraper.models import Lead, SearchResult
 from buyer_intent_scraper.pipeline import (
+    deadline_open,
     dedupe_leads,
     domain_blocked,
     location_relevant,
@@ -9,6 +12,7 @@ from buyer_intent_scraper.pipeline import (
     score_lead,
 )
 from buyer_intent_scraper.query import parse_query
+from buyer_intent_scraper.sources.world_bank import WorldBankSource
 
 
 class FakeBackend:
@@ -78,7 +82,7 @@ def test_domain_blocked_and_location_relevant():
         source_url="https://tenders.go.ke/x",
     )
     foreign = Lead(
-        name="Namibia Tenders", service="construction services", location="Nairobi, Kenya",
+        name="Namibia Tenders", service="construction services", location="Windhoek, Namibia",
         intent_signal="Namibia tender for road works", source_type="tender_portal",
         source_url="https://unifiedtenders.com/namibia",
     )
@@ -104,3 +108,41 @@ def test_score_and_dedupe():
     deduped = dedupe_leads([b, a])
     assert len(deduped) == 1
     assert deduped[0].name == "A"  # higher-confidence lead wins
+
+
+def test_deadline_open():
+    today = date(2026, 6, 6)
+    assert deadline_open("2026-07-02", today=today)  # future -> open
+    assert deadline_open("2026-06-06", today=today)  # today -> open
+    assert not deadline_open("2026-01-01", today=today)  # past -> closed
+    assert deadline_open("", today=today)  # unknown -> kept
+    assert deadline_open("not-a-date", today=today)  # unparseable -> kept
+
+
+def test_world_bank_notice_to_lead():
+    src = WorldBankSource()
+    q = parse_query("construction works in Kenya")
+    notice = {
+        "id": "OP00449225",
+        "notice_type": "Invitation for Bids",
+        "noticedate": "05-Jun-2026",
+        "submission_deadline_date": "2026-07-02T00:00:00Z",
+        "project_ctry_name": "Kenya",
+        "project_name": "Water Supply Expansion",
+        "bid_reference_no": "KE-WSP-123",
+        "bid_description": "Construction works for the expansion of a water plant",
+        "procurement_method_name": "Open Competitive Bidding",
+        "contact_organization": "Ministry of Water",
+        "contact_email": "procurement@water.go.ke",
+        "contact_phone_no": "+254712345678",
+    }
+    lead = src._notice_to_lead(notice, q)
+    assert lead.name == "Ministry of Water"
+    assert lead.intent_direction == "requesting"
+    assert lead.deadline == "2026-07-02"
+    assert lead.reference == "KE-WSP-123"
+    assert "procurement@water.go.ke" in lead.emails
+    assert lead.source_url.endswith("OP00449225")
+
+    award = dict(notice, notice_type="Contract Award", submission_deadline_date="")
+    assert src._notice_to_lead(award, q).intent_direction != "requesting"

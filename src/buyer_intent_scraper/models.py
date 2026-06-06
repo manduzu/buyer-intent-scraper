@@ -34,6 +34,9 @@ class Lead:
     phones: list[str] = field(default_factory=list)
     website: str = ""
     published_date: str = ""
+    deadline: str = ""  # submission/closing date (YYYY-MM-DD) when known
+    reference: str = ""  # tender / bid reference number
+    category: str = ""  # procurement category or method
     confidence: float = 0.0
     discovered_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")

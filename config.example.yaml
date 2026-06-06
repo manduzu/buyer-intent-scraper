@@ -8,6 +8,7 @@ queries:
 
 # Which source crawlers to run.
 sources:
+  - world_bank      # live World Bank procurement notices API (structured, with contacts)
   - google_dork
   - tender_portal
   - directory
@@ -18,6 +19,7 @@ max_leads_per_query: 50      # cap on leads kept per query (after dedupe + sort)
 min_confidence: 0.0          # drop leads below this score (0-1)
 require_contact: false       # if true, only keep leads that have an email/phone
 only_requesting: true        # keep only entities REQUESTING a service (not offering/selling)
+open_only: true              # drop tenders whose submission deadline has already passed
 require_location_match: true # drop off-target leads not tied to the query's location
 blocklist_domains:           # aggregator sites to exclude (resold/scraped tenders)
   - biddetail.com

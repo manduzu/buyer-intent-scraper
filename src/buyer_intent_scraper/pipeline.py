@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Iterable
+from datetime import date, datetime, timezone
 
 from buyer_intent_scraper.config import Config
 from buyer_intent_scraper.extract import (
@@ -19,8 +20,10 @@ from buyer_intent_scraper.search import SearchBackend, get_search_backend
 from buyer_intent_scraper.sources import (
     DirectorySource,
     GoogleDorkSource,
+    LeadSource,
     Source,
     TenderPortalSource,
+    WorldBankSource,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,23 @@ _COUNTRY_TLDS = {
 }
 
 
+def deadline_open(deadline: str, today: date | None = None) -> bool:
+    """True if a submission deadline is today or in the future.
+
+    Unknown/blank deadlines are treated as open (kept) since many legitimate
+    leads simply don't publish a closing date in a parseable form.
+    """
+    if not deadline:
+        return True
+    today = today or datetime.now(timezone.utc).date()
+    for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(deadline[:10], fmt).date() >= today
+        except ValueError:
+            continue
+    return True  # unparseable -> don't discard
+
+
 def domain_blocked(url: str, blocklist: Iterable[str]) -> bool:
     """True if the URL's registered domain is in the blocklist."""
     domain = registered_domain(url).lower()
@@ -55,7 +75,7 @@ def location_relevant(lead: Lead, query: ServiceQuery) -> bool:
     """
     if not query.location:
         return True
-    blob = f"{lead.source_title} {lead.intent_signal} {lead.name}".lower()
+    blob = f"{lead.source_title} {lead.intent_signal} {lead.name} {lead.location}".lower()
     tokens = [
         part.strip().lower()
         for part in re.split(r"[,/]", query.location)
@@ -71,10 +91,16 @@ def location_relevant(lead: Lead, query: ServiceQuery) -> bool:
     return False
 
 
-def build_sources(config: Config, backend: SearchBackend) -> list[Source]:
-    sources: list[Source] = []
+def build_sources(
+    config: Config, backend: SearchBackend
+) -> tuple[list[Source], list[LeadSource]]:
+    """Return (search_sources, lead_sources) for the configured source names."""
+    search_sources: list[Source] = []
+    lead_sources: list[LeadSource] = []
+    if "world_bank" in config.sources:
+        lead_sources.append(WorldBankSource(results_per_query=config.max_results_per_source))
     if "google_dork" in config.sources:
-        sources.append(
+        search_sources.append(
             GoogleDorkSource(
                 backend=backend,
                 results_per_dork=config.max_results_per_source,
@@ -82,7 +108,7 @@ def build_sources(config: Config, backend: SearchBackend) -> list[Source]:
             )
         )
     if "tender_portal" in config.sources:
-        sources.append(
+        search_sources.append(
             TenderPortalSource(
                 portals=config.tender_portals or None,
                 backend=backend,
@@ -90,14 +116,14 @@ def build_sources(config: Config, backend: SearchBackend) -> list[Source]:
             )
         )
     if "directory" in config.sources:
-        sources.append(
+        search_sources.append(
             DirectorySource(
                 directories=config.directories or None,
                 backend=backend,
                 results_per_dork=config.max_results_per_source,
             )
         )
-    return sources
+    return search_sources, lead_sources
 
 
 def score_lead(lead: Lead, query: ServiceQuery) -> float:
@@ -181,15 +207,25 @@ def run_query(
     query = parse_query(query_text)
     logger.info("Parsed query: service=%r location=%r", query.service, query.location)
 
-    sources = build_sources(config, backend)
+    search_sources, lead_sources = build_sources(config, backend)
     results: list[SearchResult] = []
-    for source in sources:
+    direct_leads: list[Lead] = []
+    for source in search_sources:
         try:
             found = source.collect(query, max_results=config.max_results_per_source)
             logger.info("[%s] %d results", source.name, len(found))
             results.extend(found)
         except Exception as exc:  # noqa: BLE001
             logger.warning("source %s failed: %s", source.name, exc)
+    for lead_source in lead_sources:
+        try:
+            found_leads = lead_source.collect_leads(
+                query, max_results=config.max_results_per_source
+            )
+            logger.info("[%s] %d leads", lead_source.name, len(found_leads))
+            direct_leads.extend(found_leads)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("source %s failed: %s", lead_source.name, exc)
 
     if config.blocklist_domains:
         before = len(results)
@@ -201,8 +237,13 @@ def run_query(
         query.country, respect_robots=config.respect_robots
     )
     leads = [_result_to_lead(r, query, extractor) for r in results]
+    for lead in direct_leads:
+        lead.confidence = score_lead(lead, query)
+    leads.extend(direct_leads)
     leads = dedupe_leads(leads)
 
+    if config.open_only:
+        leads = [lead for lead in leads if deadline_open(lead.deadline)]
     if config.require_location_match:
         leads = [lead for lead in leads if location_relevant(lead, query)]
     if config.only_requesting:
