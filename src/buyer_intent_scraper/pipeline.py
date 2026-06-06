@@ -21,6 +21,7 @@ from buyer_intent_scraper.sources import (
     DirectorySource,
     GeminiAgentSource,
     GoogleDorkSource,
+    KenyaPpipSource,
     LeadSource,
     Source,
     TenderPortalSource,
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Sources whose Lead.location is an authoritative field of the notice (not just a
 # copy of the query location). Only these may match location on lead.location.
-_AUTHORITATIVE_LOCATION_SOURCES = {"world_bank", "agent"}
+_AUTHORITATIVE_LOCATION_SOURCES = {"world_bank", "agent", "kenya_ppip"}
 
 # Common country -> ccTLD, used to accept leads on a matching country domain
 # even when the snippet text doesn't spell out the location.
@@ -112,6 +113,8 @@ def build_sources(
     lead_sources: list[LeadSource] = []
     if "world_bank" in config.sources:
         lead_sources.append(WorldBankSource(results_per_query=config.max_results_per_source))
+    if "kenya_ppip" in config.sources:
+        lead_sources.append(KenyaPpipSource(results_per_query=config.max_results_per_source))
     if "agent" in config.sources:
         lead_sources.append(
             GeminiAgentSource(

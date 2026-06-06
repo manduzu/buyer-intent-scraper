@@ -24,7 +24,13 @@ class EmailConfig:
 class Config:
     queries: list[str] = field(default_factory=list)
     sources: list[str] = field(
-        default_factory=lambda: ["world_bank", "google_dork", "tender_portal", "directory"]
+        default_factory=lambda: [
+            "world_bank",
+            "kenya_ppip",
+            "google_dork",
+            "tender_portal",
+            "directory",
+        ]
     )
     max_results_per_source: int = 10
     max_leads_per_query: int = 50
