@@ -12,6 +12,7 @@ sources:
   - google_dork
   - tender_portal
   - directory
+  # - agent         # Gemini browser_use agent (needs GEMINI_API_KEY + `pip install '.[agent]'`)
 
 # Tuning.
 max_results_per_source: 10   # results pulled per source per query
@@ -26,6 +27,11 @@ blocklist_domains:           # aggregator sites to exclude (resold/scraped tende
   - tenderdetail.com
 respect_robots: true         # honor robots.txt (recommended)
 country_tld: "ke"            # adds site:.<tld> variants to dork queries
+
+# Gemini browser_use agent tuning (only used when 'agent' is in sources).
+agent_model: "gemini-2.5-flash-lite"  # cheapest + most stable free-tier model
+agent_max_steps: 10                    # cap navigation steps (lower = fewer tokens)
+agent_headless: true                   # run the agent browser headless
 
 # Override the default portal / directory domains (optional).
 tender_portals:

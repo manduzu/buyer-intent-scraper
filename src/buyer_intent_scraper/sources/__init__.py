@@ -1,5 +1,6 @@
 """Source crawlers that turn a structured query into candidate web pages."""
 
+from buyer_intent_scraper.sources.agent import GeminiAgentSource
 from buyer_intent_scraper.sources.base import LeadSource, Source
 from buyer_intent_scraper.sources.directories import DirectorySource
 from buyer_intent_scraper.sources.google_dork import GoogleDorkSource
@@ -13,4 +14,5 @@ __all__ = [
     "TenderPortalSource",
     "DirectorySource",
     "WorldBankSource",
+    "GeminiAgentSource",
 ]

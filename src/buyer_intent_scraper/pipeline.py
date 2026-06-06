@@ -19,6 +19,7 @@ from buyer_intent_scraper.query import ServiceQuery, parse_query
 from buyer_intent_scraper.search import SearchBackend, get_search_backend
 from buyer_intent_scraper.sources import (
     DirectorySource,
+    GeminiAgentSource,
     GoogleDorkSource,
     LeadSource,
     Source,
@@ -99,6 +100,14 @@ def build_sources(
     lead_sources: list[LeadSource] = []
     if "world_bank" in config.sources:
         lead_sources.append(WorldBankSource(results_per_query=config.max_results_per_source))
+    if "agent" in config.sources:
+        lead_sources.append(
+            GeminiAgentSource(
+                model=config.agent_model,
+                max_steps=config.agent_max_steps,
+                headless=config.agent_headless,
+            )
+        )
     if "google_dork" in config.sources:
         search_sources.append(
             GoogleDorkSource(

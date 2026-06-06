@@ -38,6 +38,9 @@ class Config:
     )
     respect_robots: bool = True
     country_tld: str = ""
+    agent_model: str = "gemini-2.5-flash-lite"  # Gemini model for the browser_use agent
+    agent_max_steps: int = 10  # cap on agent navigation steps per query
+    agent_headless: bool = True  # run the agent browser headless
     tender_portals: list[str] = field(default_factory=list)
     directories: list[str] = field(default_factory=list)
     output_dir: str = "out"
