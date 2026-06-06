@@ -8,17 +8,25 @@ Give it a plain-English query like:
 
 > "who is requesting construction services in Nairobi, Kenya"
 
-and it researches the web via:
+It researches the web with **three engines** that feed one deduplicated report:
 
-1. **Search-engine dorking** (Google via SerpAPI, or DuckDuckGo with no API key) —
-   combines the service + location with buyer-intent keywords (RFQ, tender,
-   "looking for", "expression of interest", …).
-2. **Public tender / procurement portals** (e.g. `tenders.go.ke`, `ppip.go.ke`).
-3. **B2B directories & classifieds** (e.g. `businesslist.co.ke`, `jiji.co.ke`).
+1. **World Bank procurement API** (`world_bank`) — live, structured notices
+   (Invitation for Bids, RFEoI, …) with the procuring entity's contact, the
+   **submission deadline**, reference number and category. No API key, no LLM,
+   zero tokens — this is the reliable default engine.
+2. **Search-engine dorking + portals + directories** (`google_dork`,
+   `tender_portal`, `directory`) — Google via SerpAPI or DuckDuckGo (no key),
+   targeting buyer-intent keywords (RFQ, tender, "expression of interest", …) on
+   sites like `tenders.go.ke`, `businesslist.co.ke`.
+3. **Gemini `browser_use` agent** (`agent`, optional) — an LLM that *navigates*
+   live pages and returns structured leads. Token-frugal by design (vision off,
+   thinking off, seeded onto a results page, few steps). Needs a free Gemini key.
 
-For each candidate page it extracts the entity name, the intent signal, public
-emails/phones/website, classifies the entity type, scores a confidence value,
-deduplicates, and writes an Excel report (CSV optional).
+Leads are filtered to **buyers only** (requesting, not offering), **open
+contracts only** (past-deadline notices dropped), and the query location;
+aggregator domains (biddetail/tenderdetail) are excluded. Each lead carries the
+entity name, intent signal, public emails/phones/website, deadline/reference/
+category, a confidence score and a source URL.
 
 ## Install
 
@@ -38,9 +46,24 @@ buyer-intent-scraper scrape "construction services in Nairobi, Kenya" \
 
 Writes `out/leads.xlsx` (Excel) and prints a summary of the top leads.
 
-Options: `--format {xlsx,csv,both}` (default `xlsx`), `--sources google_dork
-tender_portal directory`, `--max-results`, `--max-leads`, `--min-confidence`,
-`--require-contact`, `--country-tld`, `--ignore-robots`.
+Options: `--format {xlsx,csv,both}` (default `xlsx`), `--sources world_bank
+google_dork tender_portal directory agent`, `--max-results`, `--max-leads`,
+`--min-confidence`, `--require-contact`, `--include-offering`, `--include-closed`,
+`--any-location`, `--include-aggregators`, `--country-tld`, `--ignore-robots`.
+
+### Optional: Gemini browser agent (Engine 3)
+
+```bash
+pip install -e ".[agent]"           # installs browser_use (heavy)
+export GEMINI_API_KEY=your_free_key  # https://aistudio.google.com/app/apikey
+buyer-intent-scraper scrape "construction works in Kenya" --sources agent -v
+```
+
+The agent is tuned for **low token usage**: no screenshots (`use_vision=False`),
+no chain-of-thought (`use_thinking=False`), `flash_mode`, trimmed history, batched
+actions, a small step cap, and it starts on a seeded results page instead of
+blind-searching. Model defaults to `gemini-2.5-flash-lite` (cheapest + most
+stable on the free tier); change via `agent_model` in config.
 
 ### Config-driven run (used by the scheduled automation)
 
@@ -57,8 +80,9 @@ emails the combined report. The format follows `output_format` in the config
 
 ## Report columns
 
-`name, entity_type, service, location, intent_signal, emails, phones, website,
-source_type, source_title, source_url, published_date, confidence, discovered_at`
+`name, entity_type, intent_direction, service, location, intent_signal, emails,
+phones, website, deadline, reference, category, source_type, source_title,
+source_url, published_date, confidence, discovered_at`
 
 The Excel sheet adds a styled header, clickable `website`/`source_url` links, a
 numeric `confidence` column, frozen header row and an auto-filter.
@@ -68,10 +92,13 @@ numeric `confidence` column, frozen header row and an auto-filter.
 See [`config.example.yaml`](config.example.yaml). Highlights:
 
 - `queries`: list of plain-English queries.
-- `sources`: any of `google_dork`, `tender_portal`, `directory`.
+- `sources`: any of `world_bank`, `google_dork`, `tender_portal`, `directory`, `agent`.
 - `tender_portals` / `directories`: override the default domain lists.
 - `country_tld`: adds `site:.<tld>` dork variants.
 - `require_contact`, `min_confidence`: quality filters.
+- `only_requesting` (buyers only), `open_only` (drop closed tenders),
+  `require_location_match`, `blocklist_domains`: targeting filters (all on by default).
+- `agent_model` / `agent_max_steps` / `agent_headless`: Gemini agent tuning.
 - `output_format`: `xlsx` (default), `csv`, or `both`.
 - `email`: optional SMTP delivery of the combined report.
 

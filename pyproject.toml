@@ -29,6 +29,10 @@ dev = [
     "types-requests>=2.31",
     "types-PyYAML>=6.0",
 ]
+# Engine 3: the Gemini-powered browser_use agent (heavy; optional).
+agent = [
+    "browser-use>=0.12",
+]
 
 [project.scripts]
 buyer-intent-scraper = "buyer_intent_scraper.cli:main"

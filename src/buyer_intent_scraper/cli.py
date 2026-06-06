@@ -46,6 +46,7 @@ def cmd_scrape(args: argparse.Namespace) -> int:
         max_leads_per_query=args.max_leads,
         require_contact=args.require_contact,
         only_requesting=not args.include_offering,
+        open_only=not args.include_closed,
         require_location_match=not args.any_location,
         min_confidence=args.min_confidence,
         respect_robots=not args.ignore_robots,
@@ -111,8 +112,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument(
         "--sources",
         nargs="+",
-        default=["google_dork", "tender_portal", "directory"],
-        choices=["google_dork", "tender_portal", "directory"],
+        default=["world_bank", "google_dork", "tender_portal", "directory"],
+        choices=["world_bank", "google_dork", "tender_portal", "directory", "agent"],
+        help="'agent' = Gemini browser_use engine (needs GEMINI_API_KEY + '.[agent]')",
     )
     sp.add_argument("--max-results", type=int, default=10, help="results per source")
     sp.add_argument("--max-leads", type=int, default=50, help="max leads to keep")
@@ -127,6 +129,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--any-location",
         action="store_true",
         help="keep leads even if they don't match the query location",
+    )
+    sp.add_argument(
+        "--include-closed",
+        action="store_true",
+        help="keep tenders whose submission deadline has already passed",
     )
     sp.add_argument(
         "--include-aggregators",

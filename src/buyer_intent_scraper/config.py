@@ -24,19 +24,23 @@ class EmailConfig:
 class Config:
     queries: list[str] = field(default_factory=list)
     sources: list[str] = field(
-        default_factory=lambda: ["google_dork", "tender_portal", "directory"]
+        default_factory=lambda: ["world_bank", "google_dork", "tender_portal", "directory"]
     )
     max_results_per_source: int = 10
     max_leads_per_query: int = 50
     min_confidence: float = 0.0
     require_contact: bool = False
     only_requesting: bool = True  # keep only demand-side (requesting) leads
+    open_only: bool = True  # drop notices whose submission deadline has passed
     require_location_match: bool = True  # drop leads not tied to the target location
     blocklist_domains: list[str] = field(
         default_factory=lambda: ["biddetail.com", "tenderdetail.com"]
     )
     respect_robots: bool = True
     country_tld: str = ""
+    agent_model: str = "gemini-2.5-flash-lite"  # Gemini model for the browser_use agent
+    agent_max_steps: int = 10  # cap on agent navigation steps per query
+    agent_headless: bool = True  # run the agent browser headless
     tender_portals: list[str] = field(default_factory=list)
     directories: list[str] = field(default_factory=list)
     output_dir: str = "out"
