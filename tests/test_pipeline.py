@@ -207,4 +207,5 @@ def test_kenya_ppip_tender_to_lead():
     assert lead.location == "Mombasa, Kenya"
     assert "cdfjomvu@ngcdf.go.ke" in lead.emails
     assert lead.source_url.endswith("292115")
-    assert lead.website == "ngcdf.go.ke"
+    # website stays blank so same-entity tenders don't collapse in dedupe
+    assert lead.website == ""
