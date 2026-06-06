@@ -18,6 +18,10 @@ max_leads_per_query: 50      # cap on leads kept per query (after dedupe + sort)
 min_confidence: 0.0          # drop leads below this score (0-1)
 require_contact: false       # if true, only keep leads that have an email/phone
 only_requesting: true        # keep only entities REQUESTING a service (not offering/selling)
+require_location_match: true # drop off-target leads not tied to the query's location
+blocklist_domains:           # aggregator sites to exclude (resold/scraped tenders)
+  - biddetail.com
+  - tenderdetail.com
 respect_robots: true         # honor robots.txt (recommended)
 country_tld: "ke"            # adds site:.<tld> variants to dork queries
 

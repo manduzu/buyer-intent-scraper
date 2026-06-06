@@ -11,6 +11,7 @@ from buyer_intent_scraper.extract import (
     ContactExtractor,
     classify_entity,
     classify_intent_direction,
+    registered_domain,
 )
 from buyer_intent_scraper.models import Lead, SearchResult
 from buyer_intent_scraper.query import ServiceQuery, parse_query
@@ -23,6 +24,51 @@ from buyer_intent_scraper.sources import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Common country -> ccTLD, used to accept leads on a matching country domain
+# even when the snippet text doesn't spell out the location.
+_COUNTRY_TLDS = {
+    "kenya": "ke",
+    "uganda": "ug",
+    "tanzania": "tz",
+    "rwanda": "rw",
+    "nigeria": "ng",
+    "ghana": "gh",
+    "south africa": "za",
+    "ethiopia": "et",
+}
+
+
+def domain_blocked(url: str, blocklist: Iterable[str]) -> bool:
+    """True if the URL's registered domain is in the blocklist."""
+    domain = registered_domain(url).lower()
+    if not domain:
+        return False
+    return any(domain == b.lower() or domain.endswith("." + b.lower()) for b in blocklist)
+
+
+def location_relevant(lead: Lead, query: ServiceQuery) -> bool:
+    """True if the lead plausibly belongs to the query's target location.
+
+    A lead matches when its text mentions a location token (city/country) or
+    when it sits on the target country's ccTLD (e.g. ``.ke`` for Kenya).
+    """
+    if not query.location:
+        return True
+    blob = f"{lead.source_title} {lead.intent_signal} {lead.name}".lower()
+    tokens = [
+        part.strip().lower()
+        for part in re.split(r"[,/]", query.location)
+        if len(part.strip()) >= 3
+    ]
+    if any(tok in blob for tok in tokens):
+        return True
+    tld = _COUNTRY_TLDS.get(query.country.lower(), "")
+    if tld:
+        domain = registered_domain(lead.source_url).lower()
+        if domain.endswith("." + tld):
+            return True
+    return False
 
 
 def build_sources(config: Config, backend: SearchBackend) -> list[Source]:
@@ -145,12 +191,20 @@ def run_query(
         except Exception as exc:  # noqa: BLE001
             logger.warning("source %s failed: %s", source.name, exc)
 
+    if config.blocklist_domains:
+        before = len(results)
+        results = [r for r in results if not domain_blocked(r.url, config.blocklist_domains)]
+        if before != len(results):
+            logger.info("blocklist removed %d aggregator result(s)", before - len(results))
+
     extractor = ContactExtractor.for_country(
         query.country, respect_robots=config.respect_robots
     )
     leads = [_result_to_lead(r, query, extractor) for r in results]
     leads = dedupe_leads(leads)
 
+    if config.require_location_match:
+        leads = [lead for lead in leads if location_relevant(lead, query)]
     if config.only_requesting:
         leads = [lead for lead in leads if lead.intent_direction == "requesting"]
     if config.require_contact:

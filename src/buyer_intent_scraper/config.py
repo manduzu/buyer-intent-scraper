@@ -31,6 +31,10 @@ class Config:
     min_confidence: float = 0.0
     require_contact: bool = False
     only_requesting: bool = True  # keep only demand-side (requesting) leads
+    require_location_match: bool = True  # drop leads not tied to the target location
+    blocklist_domains: list[str] = field(
+        default_factory=lambda: ["biddetail.com", "tenderdetail.com"]
+    )
     respect_robots: bool = True
     country_tld: str = ""
     tender_portals: list[str] = field(default_factory=list)

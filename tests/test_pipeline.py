@@ -1,7 +1,13 @@
 from buyer_intent_scraper.config import Config
 from buyer_intent_scraper.extract import ContactExtractor
-from buyer_intent_scraper.models import SearchResult
-from buyer_intent_scraper.pipeline import dedupe_leads, run_query, score_lead
+from buyer_intent_scraper.models import Lead, SearchResult
+from buyer_intent_scraper.pipeline import (
+    dedupe_leads,
+    domain_blocked,
+    location_relevant,
+    run_query,
+    score_lead,
+)
 from buyer_intent_scraper.query import parse_query
 
 
@@ -61,10 +67,27 @@ def test_require_contact_filters(monkeypatch):
     assert leads == []
 
 
+def test_domain_blocked_and_location_relevant():
+    q = parse_query("construction services in Nairobi, Kenya")
+    assert domain_blocked("https://www.biddetail.com/kenya/rfq", ["biddetail.com"])
+    assert not domain_blocked("https://tenders.go.ke/notice", ["biddetail.com"])
+
+    kenyan = Lead(
+        name="NCIA", service="construction services", location="Nairobi, Kenya",
+        intent_signal="tender notice", source_type="tender_portal",
+        source_url="https://tenders.go.ke/x",
+    )
+    foreign = Lead(
+        name="Namibia Tenders", service="construction services", location="Nairobi, Kenya",
+        intent_signal="Namibia tender for road works", source_type="tender_portal",
+        source_url="https://unifiedtenders.com/namibia",
+    )
+    assert location_relevant(kenyan, q)  # matches via .ke domain
+    assert not location_relevant(foreign, q)  # off-target, dropped
+
+
 def test_score_and_dedupe():
     q = parse_query("construction services in Nairobi, Kenya")
-    from buyer_intent_scraper.models import Lead
-
     a = Lead(
         name="A", service="construction services", location="Nairobi, Kenya",
         intent_signal="tender for construction services", source_type="tender_portal",

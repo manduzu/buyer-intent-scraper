@@ -46,11 +46,14 @@ def cmd_scrape(args: argparse.Namespace) -> int:
         max_leads_per_query=args.max_leads,
         require_contact=args.require_contact,
         only_requesting=not args.include_offering,
+        require_location_match=not args.any_location,
         min_confidence=args.min_confidence,
         respect_robots=not args.ignore_robots,
         country_tld=args.country_tld or "",
         output_format=args.format,
     )
+    if args.include_aggregators:
+        config.blocklist_domains = []
     leads = run_query(args.query, config=config)
     out_base = Path(args.out) if args.out else Path(config.output_dir) / _slug(args.query)
     written = write_output(leads, out_base, fmt=config.output_format)
@@ -119,6 +122,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-offering",
         action="store_true",
         help="also include providers/sellers (default: only entities requesting)",
+    )
+    sp.add_argument(
+        "--any-location",
+        action="store_true",
+        help="keep leads even if they don't match the query location",
+    )
+    sp.add_argument(
+        "--include-aggregators",
+        action="store_true",
+        help="do not drop aggregator domains (biddetail, tenderdetail, ...)",
     )
     sp.add_argument("--country-tld", default="", help='restrict some dorks to a TLD, e.g. "ke"')
     sp.add_argument("--ignore-robots", action="store_true", help="do not honor robots.txt")
