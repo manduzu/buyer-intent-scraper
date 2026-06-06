@@ -89,6 +89,26 @@ def test_domain_blocked_and_location_relevant():
     assert location_relevant(kenyan, q)  # matches via .ke domain
     assert not location_relevant(foreign, q)  # off-target, dropped
 
+    # Regression: a search lead's `location` is just a copy of query.location,
+    # so it must NOT count toward the match. A foreign tender whose evidence
+    # text is about Namibia stays dropped even though location == query.location.
+    search_offtarget = Lead(
+        name="Some Tender", service="construction services",
+        location="Nairobi, Kenya",  # copied from the query in _result_to_lead
+        intent_signal="Road works tender in Windhoek", source_type="google_dork",
+        source_url="https://globaltenders.com/namibia",
+    )
+    assert not location_relevant(search_offtarget, q)
+
+    # World Bank leads carry an authoritative country, so they match on it even
+    # when the title/snippet don't spell the location out.
+    wb = Lead(
+        name="Ministry of Water", service="construction services", location="Kenya",
+        intent_signal="Invitation for Bids: water plant works", source_type="world_bank",
+        source_url="https://projects.worldbank.org/x",
+    )
+    assert location_relevant(wb, q)
+
 
 def test_score_and_dedupe():
     q = parse_query("construction services in Nairobi, Kenya")
