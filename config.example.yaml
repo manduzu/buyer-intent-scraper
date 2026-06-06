@@ -1,0 +1,48 @@
+# Copy to config.yaml and edit. config.yaml is git-ignored.
+
+# Plain-English buyer-intent queries. The parser extracts the service + location.
+queries:
+  - "construction services in Nairobi, Kenya"
+  # - "borehole drilling services in Kiambu, Kenya"
+  # - "office cleaning services in Mombasa, Kenya"
+
+# Which source crawlers to run.
+sources:
+  - google_dork
+  - tender_portal
+  - directory
+
+# Tuning.
+max_results_per_source: 10   # results pulled per source per query
+max_leads_per_query: 50      # cap on leads kept per query (after dedupe + sort)
+min_confidence: 0.0          # drop leads below this score (0-1)
+require_contact: false       # if true, only keep leads that have an email/phone/website
+respect_robots: true         # honor robots.txt (recommended)
+country_tld: "ke"            # adds site:.<tld> variants to dork queries
+
+# Override the default portal / directory domains (optional).
+tender_portals:
+  - tenders.go.ke
+  - ppip.go.ke
+  - globaltenders.com
+directories:
+  - businesslist.co.ke
+  - yellowpageskenya.com
+  - jiji.co.ke
+
+output_dir: out
+output_format: xlsx          # xlsx (Excel, default) | csv | both
+
+# Optional: email the combined CSV after a run. Credentials come from env vars
+# (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM) so no secrets are
+# committed. Set enabled: true to turn this on.
+email:
+  enabled: false
+  smtp_host: "${SMTP_HOST}"
+  smtp_port: 587
+  smtp_user: "${SMTP_USER}"
+  smtp_password: "${SMTP_PASSWORD}"
+  sender: "${EMAIL_FROM}"
+  recipients:
+    - "masievialvin98@gmail.com"
+  subject: "Buyer-intent leads"

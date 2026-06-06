@@ -1,0 +1,49 @@
+"""YAML configuration loading."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+
+@dataclass
+class EmailConfig:
+    enabled: bool = False
+    smtp_host: str = "${SMTP_HOST}"
+    smtp_port: int = 587
+    smtp_user: str = "${SMTP_USER}"
+    smtp_password: str = "${SMTP_PASSWORD}"
+    sender: str = "${EMAIL_FROM}"
+    recipients: list[str] = field(default_factory=list)
+    subject: str = "Buyer-intent leads"
+
+
+@dataclass
+class Config:
+    queries: list[str] = field(default_factory=list)
+    sources: list[str] = field(
+        default_factory=lambda: ["google_dork", "tender_portal", "directory"]
+    )
+    max_results_per_source: int = 10
+    max_leads_per_query: int = 50
+    min_confidence: float = 0.0
+    require_contact: bool = False
+    respect_robots: bool = True
+    country_tld: str = ""
+    tender_portals: list[str] = field(default_factory=list)
+    directories: list[str] = field(default_factory=list)
+    output_dir: str = "out"
+    output_format: str = "xlsx"  # xlsx | csv | both
+    email: EmailConfig = field(default_factory=EmailConfig)
+
+    @classmethod
+    def load(cls, path: str | Path) -> Config:
+        data = yaml.safe_load(Path(path).read_text()) or {}
+        email_data = data.pop("email", {}) or {}
+        cfg = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+        cfg.email = EmailConfig(
+            **{k: v for k, v in email_data.items() if k in EmailConfig.__dataclass_fields__}
+        )
+        return cfg
