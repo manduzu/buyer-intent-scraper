@@ -171,9 +171,35 @@ def test_world_bank_notice_to_lead():
 
 def test_kenya_ppip_keyword_selection():
     src = KenyaPpipSource()
-    assert src._keyword(parse_query("construction works in Kenya")) == "construction"
-    assert src._keyword(parse_query("road works in Kenya")) == "road"
-    assert src._keyword(parse_query("office cleaning services in Nairobi, Kenya")) == "cleaning"
+    assert src._keywords(parse_query("construction works in Kenya")) == ["construction"]
+    assert src._keywords(parse_query("road works in Kenya")) == ["road"]
+    assert src._keywords(parse_query("office cleaning services in Nairobi, Kenya")) == ["office", "cleaning"]
+
+
+def test_kenya_ppip_prefers_specific_over_broad():
+    """Specific terms like 'dental' must be preferred over broad nouns like 'equipment'."""
+    src = KenyaPpipSource()
+    # 'dental equipment' -> ['dental'] (equipment is a broad noun)
+    assert src._keywords(parse_query("dental equipment in Kenya")) == ["dental"]
+    # 'dental supplies' -> ['dental'] (supplies is a broad noun)
+    assert src._keywords(parse_query("dental supplies in Kenya")) == ["dental"]
+    # 'office furniture' -> ['office', 'furniture'] (neither is in broad nouns for this context)
+    kws = src._keywords(parse_query("office furniture in Kenya"))
+    assert "office" in kws
+    # Purely broad noun query still works: 'equipment' alone
+    assert src._keywords(parse_query("equipment in Kenya")) == ["equipment"]
+
+
+def test_kenya_ppip_relevance_filter():
+    """The post-filter should reject tenders whose title doesn't match any keyword."""
+    src = KenyaPpipSource()
+    keywords = ["dental"]
+    assert src._is_relevant("SUPPLY AND DELIVERY OF DENTAL CONSUMABLES", keywords)
+    assert not src._is_relevant("SUPPLY OF SPORTS EQUIPMENT", keywords)
+    assert not src._is_relevant("TENDER FOR SUPPLY OF ELECTRONICS EQUIPMENT", keywords)
+    # Multi-keyword case
+    assert src._is_relevant("SUPPLY OF DENTAL CHAIR", ["dental", "equipment"])
+    assert src._is_relevant("LAB EQUIPMENT FOR HOSPITAL", ["dental", "equipment"])
 
 
 def test_kenya_ppip_tender_to_lead():

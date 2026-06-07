@@ -36,11 +36,34 @@ _GENERIC_TERMS = {
     "work",
     "supply",
     "provision",
+    "delivery",
+    "tender",
+    "tenders",
+    "request",
     "and",
     "the",
     "of",
     "in",
     "for",
+}
+
+# Broad nouns that are too generic to search alone when a more specific
+# qualifier is available (e.g. "dental" in "dental equipment").
+_BROAD_NOUNS = {
+    "equipment",
+    "equipments",
+    "supplies",
+    "materials",
+    "goods",
+    "items",
+    "products",
+    "accessories",
+    "tools",
+    "machines",
+    "renovation",
+    "construction",
+    "maintenance",
+    "installation",
 }
 
 # Suppress the expired-certificate warning (see module docstring).
@@ -57,43 +80,64 @@ class KenyaPpipSource:
         self.results_per_query = results_per_query
         self.timeout = timeout
 
-    def _keyword(self, query: ServiceQuery) -> str:
-        """Pick the most specific service word to filter the portal's title field."""
-        tokens = [t for t in query.service.split() if len(t) >= 4]
+    def _keywords(self, query: ServiceQuery) -> list[str]:
+        """Return prioritised search terms for the PPIP title API.
+
+        Specific qualifiers (e.g. ``"dental"``) are preferred over broad nouns
+        (e.g. ``"equipment"``).  The caller queries the API with each term
+        separately and merges results.
+        """
+        tokens = [t for t in query.service.split() if len(t) >= 3]
         meaningful = [t for t in tokens if t.lower() not in _GENERIC_TERMS]
-        pool = meaningful or tokens
-        if not pool:
-            return query.service.strip()
-        return max(pool, key=len)
+        if not meaningful:
+            return [query.service.strip()]
+        specific = [t for t in meaningful if t.lower() not in _BROAD_NOUNS]
+        return specific if specific else meaningful
+
+    def _is_relevant(self, title: str, keywords: list[str]) -> bool:
+        """True when the tender title contains at least one search keyword."""
+        title_lower = title.lower()
+        return any(kw.lower() in title_lower for kw in keywords)
 
     def collect_leads(self, query: ServiceQuery, max_results: int = 20) -> list[Lead]:
         target = max(max_results, self.results_per_query)
-        keyword = self._keyword(query)
+        keywords = self._keywords(query)
+        seen_ids: set[str] = set()
         leads: list[Lead] = []
-        page = 1
-        last_page = 1
-        max_pages = (target // PAGE_SIZE) + 2  # bound the crawl
-        while page <= last_page and page <= max_pages and len(leads) < target:
-            try:
-                resp = requests.get(
-                    API_URL,
-                    params={"title": keyword, "page": str(page)},
-                    timeout=self.timeout,
-                    headers={"User-Agent": "Mozilla/5.0 (buyer-intent-scraper)"},
-                    verify=False,
-                )
-                resp.raise_for_status()
-                payload = resp.json()
-            except (requests.RequestException, ValueError) as exc:
-                logger.warning("Kenya PPIP API request failed (page %s): %s", page, exc)
-                break
-            last_page = int(payload.get("last_page") or 1)
-            rows = payload.get("data") or []
-            if not rows:
-                break
-            for row in rows:
-                leads.append(self._tender_to_lead(row, query))
-            page += 1
+
+        for keyword in keywords:
+            page = 1
+            last_page = 1
+            max_pages = (target // PAGE_SIZE) + 2
+            while page <= last_page and page <= max_pages and len(leads) < target:
+                try:
+                    resp = requests.get(
+                        API_URL,
+                        params={"title": keyword, "page": str(page)},
+                        timeout=self.timeout,
+                        headers={"User-Agent": "Mozilla/5.0 (buyer-intent-scraper)"},
+                        verify=False,
+                    )
+                    resp.raise_for_status()
+                    payload = resp.json()
+                except (requests.RequestException, ValueError) as exc:
+                    logger.warning("Kenya PPIP API request failed (page %s): %s", page, exc)
+                    break
+                last_page = int(payload.get("last_page") or 1)
+                rows = payload.get("data") or []
+                if not rows:
+                    break
+                for row in rows:
+                    tid = str(row.get("id", ""))
+                    title = str(row.get("title") or "")
+                    if tid in seen_ids:
+                        continue
+                    if not self._is_relevant(title, keywords):
+                        continue
+                    seen_ids.add(tid)
+                    leads.append(self._tender_to_lead(row, query))
+                page += 1
+
         return leads[:target]
 
     def _tender_to_lead(self, t: dict, query: ServiceQuery) -> Lead:
