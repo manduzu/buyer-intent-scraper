@@ -18,6 +18,25 @@ _INTENT_PREFIXES = [
 # multi-word services like "office cleaning services" stay intact.
 _LOCATION_SPLITTERS = [" in ", " around ", " near ", " within "]
 
+# Multi-word country names that must not be split by the two-word "<City>
+# <Country>" heuristic in :func:`_normalize_location` (lower-cased for matching).
+_MULTIWORD_COUNTRIES = {
+    "south africa",
+    "south sudan",
+    "united states",
+    "united kingdom",
+    "united arab emirates",
+    "saudi arabia",
+    "sri lanka",
+    "new zealand",
+    "ivory coast",
+    "costa rica",
+    "sierra leone",
+    "burkina faso",
+    "democratic republic of congo",
+    "papua new guinea",
+}
+
 # Buyer-intent keywords used to build dork queries. Order roughly by strength.
 INTENT_KEYWORDS: list[str] = [
     "request for quotation",
@@ -83,7 +102,16 @@ def _split_service_location(text: str) -> tuple[str, str]:
 
 
 def _normalize_location(location: str) -> str:
-    """Normalize "Kenya Nairobi" / "nairobi kenya" style into "Nairobi, Kenya"."""
+    """Tidy a freeform location into a comma-separated, title-cased form.
+
+    Whitespace is collapsed and each part is title-cased. A value that already
+    contains a comma keeps its given order (e.g. ``"nairobi, kenya"`` ->
+    ``"Nairobi, Kenya"``). A bare two-word value is comma-split (assumed
+    ``"<City> <Country>"``), so ``"Kenya Nairobi"`` -> ``"Kenya, Nairobi"`` -- it
+    is *not* reordered. Known multi-word country names (e.g. ``"South Africa"``)
+    are recognised first so they are kept intact instead of being mangled into
+    ``"South, Africa"``.
+    """
     if not location:
         return ""
     location = re.sub(r"\s+", " ", location).strip(" .,")
@@ -91,8 +119,18 @@ def _normalize_location(location: str) -> str:
         parts = [p.strip().title() for p in location.split(",") if p.strip()]
         return ", ".join(parts)
     words = [w for w in location.split(" ") if w]
+    lowered = [w.lower() for w in words]
+    # A bare multi-word country (e.g. "South Africa") must stay intact.
+    if " ".join(lowered) in _MULTIWORD_COUNTRIES:
+        return location.title()
+    # "<City...> <multi-word country>" -> "City, Country".
+    for country in _MULTIWORD_COUNTRIES:
+        c_words = country.split(" ")
+        if len(words) > len(c_words) and lowered[-len(c_words):] == c_words:
+            city = " ".join(words[: -len(c_words)]).title()
+            return f"{city}, {country.title()}"
     if len(words) == 2:
-        # Heuristic: assume "<City> <Country>"; keep order but comma-separate.
+        # Ambiguous two-word value: assume "<City> <Country>" and comma-split.
         return f"{words[0].title()}, {words[1].title()}"
     return location.title()
 
@@ -113,6 +151,8 @@ def parse_query(text: str, intent_keywords: list[str] | None = None) -> ServiceQ
     return ServiceQuery(
         service=service,
         location=location,
-        intent_keywords=list(intent_keywords) if intent_keywords else list(INTENT_KEYWORDS),
+        intent_keywords=(
+            list(intent_keywords) if intent_keywords is not None else list(INTENT_KEYWORDS)
+        ),
         raw=raw,
     )

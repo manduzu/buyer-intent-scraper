@@ -27,6 +27,18 @@ def test_no_location():
     assert q.country == ""
 
 
+def test_multiword_country_kept_intact():
+    q = parse_query("construction works in South Africa")
+    assert q.location == "South Africa"
+    assert q.country == "South Africa"
+
+
+def test_city_with_multiword_country():
+    q = parse_query("road works in Cape Town South Africa")
+    assert q.location == "Cape Town, South Africa"
+    assert q.country == "South Africa"
+
+
 def test_intent_keywords_present():
     q = parse_query("cleaning services in Mombasa")
     assert any("tender" == kw for kw in q.intent_keywords)
